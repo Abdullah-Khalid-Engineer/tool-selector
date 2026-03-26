@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PM Tool Selector</title>
+    <style>
+        :root { --main: #d32f2f; --bg: #f0f2f5; --card-bg: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .container { max-width: 550px; margin: auto; background: white; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 25px; }
+        
+        /* Header & Search */
+        h2 { color: var(--main); text-align: center; margin-top: 0; }
+        .search-box { width: 100%; padding: 14px; margin: 15px 0; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+        .search-box:focus { border-color: var(--main); outline: none; }
+
+        /* List Styling */
+        .cat-title { background: #444; color: white; padding: 10px; font-size: 13px; font-weight: bold; margin-top: 20px; border-radius: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        .tool-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .tool-item input { width: 22px; height: 22px; margin-right: 15px; accent-color: var(--main); }
+        
+        /* Submit Button */
+        .btn-gen { width: 100%; padding: 18px; background: var(--main); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 25px; transition: 0.3s; }
+        .btn-gen:hover { background: #b71c1c; }
+
+        /* THE GENERATED RESULT AREA - IMPROVED VISUALS */
+        #summary-box { display: none; margin-top: 30px; border-radius: 12px; overflow: hidden; border: 1px solid #ccc; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .summary-header { background: #222; color: #fff; padding: 15px; text-align: center; font-weight: bold; font-size: 14px; }
+        .summary-body { padding: 20px; background: #fff; position: relative; }
+        #output-text { 
+            white-space: pre-wrap; 
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace; 
+            font-size: 14px; 
+            color: #333; 
+            line-height: 1.6; 
+            margin: 0;
+            padding-bottom: 50px;
+        }
+        
+        /* Action Buttons for Result */
+        .summary-actions { display: flex; gap: 10px; padding: 15px; background: #f9f9f9; border-top: 1px solid #eee; }
+        .action-btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+        .copy-btn { background: #007bff; color: white; }
+        .reset-btn { background: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="sticky-header">
+        <h2>PM TOOL PORTAL</h2>
+        <input type="text" id="engine" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;" placeholder="Unit / Engine Description (e.g. VHP-7044)">
+        <input type="text" id="search" class="search-box" placeholder="🔍 Search tool name..." onkeyup="filterTools()">
+    </div>
+
+    <div id="tool-container">Loading data...</div>
+
+    <button class="btn-gen" onclick="generate()">Generate Formal List</button>
+
+    <div id="summary-box">
+        <div class="summary-header">EQUIPMENT REQUISITION SLIP</div>
+        <div class="summary-body">
+            <pre id="output-text"></pre>
+        </div>
+        <div class="summary-actions">
+            <button class="action-btn copy-btn" onclick="copy()">Copy to Clipboard</button>
+            <button class="action-btn reset-btn" onclick="location.reload()">Reset All</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let tools = [];
+    async function init() {
+        try {
+            const response = await fetch('tools.json');
+            tools = await response.json();
+            render();
+        } catch(e) { document.getElementById('tool-container').innerText = "Error: Ensure tools.json is in the same folder."; }
+    }
+
+    function render() {
+        const container = document.getElementById('tool-container');
+        const groups = tools.reduce((acc, t) => {
+            (acc[t.category] = acc[t.category] || []).push(t);
+            return acc;
+        }, {});
+
+        let html = '';
+        for (const cat in groups) {
+            html += `<div class="cat-section"><div class="cat-title">${cat}</div>`;
+            groups[cat].forEach(t => {
+                html += `<label class="tool-item" data-name="${t.name.toLowerCase()}">
+                            <input type="checkbox" value="${t.name}" data-cat="${cat}">
+                            ${t.name}
+                         </label>`;
+            });
+            html += `</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function filterTools() {
+        const query = document.getElementById('search').value.toLowerCase();
+        document.querySelectorAll('.tool-item').forEach(item => {
+            item.style.display = item.getAttribute('data-name').includes(query) ? 'flex' : 'none';
+        });
+    }
+
+    function generate() {
+        const engine = document.getElementById('engine').value || "Not Specified";
+        const selected = document.querySelectorAll('input:checked');
+        if (selected.length === 0) return alert("Select tools first!");
+
+        let res = `--------------------------------\n`;
+        res += `   ENGINE REQUISITION REPORT\n`;
+        res += `--------------------------------\n`;
+        res += `UNIT: ${engine.toUpperCase()}\n`;
+        res += `DATE: ${new Date().toLocaleString()}\n`;
+        res += `--------------------------------\n`;
+        
+        let curCat = "";
+        selected.forEach(cb => {
+            let cat = cb.getAttribute('data-cat');
+            if (cat !== curCat) {
+                curCat = cat;
+                res += `\n>> ${curCat.toUpperCase()}\n`;
+            }
+            res += ` - ${cb.value}\n`;
+        });
+
+        res += `\n--------------------------------\n`;
+        res += `   End of List\n`;
+
+        document.getElementById('output-text').innerText = res;
+        document.getElementById('summary-box').style.display = 'block';
+        document.getElementById('summary-box').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function copy() {
+        navigator.clipboard.writeText(document.getElementById('output-text').innerText);
+        alert("List Copied! Paste it into WhatsApp.");
+    }
+    init();
+</script>
+
+</body>
+</html>
